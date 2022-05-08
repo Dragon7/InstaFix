@@ -15,7 +15,6 @@ templates = Jinja2Templates(directory="templates")
 media_dict = {}
 cookies = MozillaCookieJar("cookies.txt")
 cookies.load()
-client = httpx.Client(http2=True, cookies=cookies)
 
 CRAWLER_UA = set(
     [
@@ -46,9 +45,11 @@ headers = {
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36",
 }
 
+client = httpx.Client(http2=True, cookies=cookies, headers=headers)
+
 
 def get_data(url):
-    r = client.get(url, headers=headers)
+    r = client.get(url, follow_redirects=True)
     tree = html.fromstring(r.text)
     for script in tree.xpath("//script"):
         text = script.text or ""
@@ -110,8 +111,10 @@ def videos(request: Request, post_id: str, num: int):
     video_url = media["video_versions"][-1]["url"]
     if request.headers.get("User-Agent") not in CRAWLER_UA:
         return RedirectResponse(video_url, status_code=302)
-    return StreamingResponse(
-        client.get(video_url, stream=True).iter_bytes(),
-        media_type="video/mp4",
-        headers={"Content-Disposition": f"inline; filename={post_id}.mp4"},
-    )
+
+    with client.stream("GET", video_url, follow_redirects=True) as response:
+        return StreamingResponse(
+            response.iter_bytes(),
+            media_type="video/mp4",
+            headers={"Content-Disposition": f"inline; filename={post_id}.mp4"},
+        )
