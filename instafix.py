@@ -49,8 +49,6 @@ headers = {
 
 def get_data(url):
     r = client.get(url, headers=headers)
-    with open("data.html", "w") as f:
-        f.write(r.text)
     tree = html.fromstring(r.text)
     for script in tree.xpath("//script"):
         text = script.text or ""
